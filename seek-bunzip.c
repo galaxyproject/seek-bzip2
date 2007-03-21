@@ -16,14 +16,14 @@ static unsigned int seek_bits( bunzip_data *bd, unsigned long pos )
 {
     off_t n_byte = pos / 8;
     char n_bit = pos % 8;
-    
+
     // Seek the underlying file descriptor
     lseek( bd->in_fd, n_byte, SEEK_SET );
-    
+
     // Init the buffer at the right bit position
     bd->inbufBitCount = bd->inbufPos = bd->inbufCount = 0;
     get_bits( bd, n_bit );
-    
+
     // Update the bit position counter to match
     bd->inPosBits = pos;
 }

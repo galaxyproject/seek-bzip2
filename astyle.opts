@@ -1,0 +1,8 @@
+indent=spaces=4
+brackets=break
+indent-classes
+indent-switches
+pad=oper
+pad=paren-in
+one-line=keep-statements
+convert-tabs
