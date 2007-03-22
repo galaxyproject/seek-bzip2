@@ -3,6 +3,8 @@
 
 #include "micro-bunzip.h"
 
+#define BUF_SIZE 8192
+
 /**
  * Read a bzip2 file from stdin and print
  * 1) The block size
@@ -15,32 +17,66 @@
 int main( int argc, char*argv[] )
 {
     bunzip_data *bd;
-    int i;
-    unsigned long position_before;
+    int status;
+    unsigned long position;
     char * c;
+    char buffer[BUF_SIZE];
+    int gotcount;
+    int totalcount;
 
     /* Attempt to open the bzip2 file, if successfull this consumes the
      * entire header and moves us to the start of the first block.
      */
-    if ( ! ( i = start_bunzip( &bd, 0, 0, 0 ) ) )
+    if ( ! ( status = start_bunzip( &bd, 0, 0, 0 ) ) )
     {
-        /* Print the block size */
-        fprintf( stdout, "Block size: %d\n", bd->dbufSize );
-
-        for ( ; ; )
-        {
-            /* Save the start of the block before reading it */
-            position_before = bd->inPosBits;
+        for( ; ; )
+        {               
+            /* Determine position */
+            position = lseek( bd->in_fd, 0, SEEK_CUR ) - bd->inbufCount + bd->inbufPos;
+            position = position * 8 - bd->inbufBitCount;
 
             /* Read one block */
-            int i = read_bunzip_data( bd );
+            status = get_next_block( bd );
+            
+            /* Reset the total size counter for each block */
+            totalcount = 0;
 
             /* Non-zero return value indicates an error, break out */
-            if ( i ) break;
-
+            if ( status ) break;
+            
+            /* This is really the only other thing init_block does, hrmm */
+            bd->writeCRC = 0xffffffffUL;
+            
+            /* Decompress the block and throw away, but keep track of the 
+               total size of the decompressed data */
+            for ( ; ; )
+            {
+                gotcount = read_bunzip( bd, buffer, BUF_SIZE );
+                if ( gotcount < 0 )
+                {
+                    status = gotcount;
+                    goto bzip_table_finish;
+                }
+                else if ( gotcount == 0 )
+                {
+                    break;
+                }
+                else
+                {
+                    totalcount += gotcount;
+                }
+            }
             /* Print the position of the first bit in the block header */
-            fprintf( stdout, "Block start at: %u\n", position_before );
+            fprintf( stdout, "%u\t%d\n", position, totalcount );
         }
+    }
+    
+bzip_table_finish:
+
+    /* If we reached the last block, do a CRC check */
+    if ( status == RETVAL_LAST_BLOCK && bd->headerCRC == bd->totalCRC) 
+    {
+        status = RETVAL_OK;
     }
 
     /* Free decompression buffer and bzip_data */
@@ -48,10 +84,10 @@ int main( int argc, char*argv[] )
     free( bd );
 
     /* Print error if required */
-    if ( i )
+    if ( status )
     {
-        fprintf( stderr, "\n%s\n", bunzip_errors[-i] );
+        fprintf( stderr, "\n%s\n", bunzip_errors[-status] );
     }
 
-    return i;
+    return status;
 }

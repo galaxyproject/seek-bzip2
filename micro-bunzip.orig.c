@@ -54,8 +54,6 @@
 #define RETVAL_OUT_OF_MEMORY			(-6)
 #define RETVAL_OBSOLETE_INPUT			(-7)
 
-#define RETVAL_END_OF_BLOCK             (-8)
-
 /* Other housekeeping constants */
 #define IOBUF_SIZE			4096
 
@@ -88,7 +86,7 @@ typedef struct {
 
 /* Return the next nnn bits of input.  All reads from the compressed input
    are done through this function.  All reads are big endian */
-unsigned int get_bits(bunzip_data *bd, char bits_wanted)
+static unsigned int get_bits(bunzip_data *bd, char bits_wanted)
 {
 	unsigned int bits=0;
 
@@ -121,7 +119,7 @@ unsigned int get_bits(bunzip_data *bd, char bits_wanted)
 
 /* Unpacks the next block and sets up for the inverse burrows-wheeler step. */
 
-int get_next_block(bunzip_data *bd)
+static int get_next_block(bunzip_data *bd)
 {
 	struct group_data *hufGroup;
 	int dbufCount,nextSym,dbufSize,groupCount,*base,*limit,selector,
@@ -419,13 +417,7 @@ extern int read_bunzip(bunzip_data *bd, char *outbuf, int len)
 	int pos,current,previous,gotcount;
 
 	/* If last read was short due to end of file, return last block now */
-	/* if(bd->writeCount<0) return bd->writeCount; */
-	
-	/* james@bx.psu.edu: writeCount goes to -1 when the buffer is fully
-	   decoded, which results in this returning RETVAL_LAST_BLOCK, also
-	   equal to -1... Confusing, I'm returning 0 here to indicate no 
-	   bytes written into the buffer */
-    if(bd->writeCount<0) return 0;
+	if(bd->writeCount<0) return bd->writeCount;
 
 	gotcount = 0;
 	dbuf=bd->dbuf;
@@ -441,7 +433,6 @@ extern int read_bunzip(bunzip_data *bd, char *outbuf, int len)
 		--bd->writeCopies;
 		/* Loop outputting bytes */
 		for(;;) {
-			/* Write next byte into output buffer, updating CRC */
 			/* If the output buffer is full, snapshot state and return */
 			if(gotcount >= len) {
 				bd->writePos=pos;
@@ -449,6 +440,7 @@ extern int read_bunzip(bunzip_data *bd, char *outbuf, int len)
 				bd->writeCopies++;
 				return len;
 			}
+			/* Write next byte into output buffer, updating CRC */
 			outbuf[gotcount++] = current;
 			bd->writeCRC=(((bd->writeCRC)<<8)
 						  ^bd->crc32Table[((bd->writeCRC)>>24)^current]);
@@ -458,7 +450,7 @@ extern int read_bunzip(bunzip_data *bd, char *outbuf, int len)
 				continue;
 			}
 decode_next_byte:
-            if (!bd->writeCount--) break;
+			if (!bd->writeCount--) break;
 			/* Follow sequence vector to undo Burrows-Wheeler transform */
 			previous=current;
 			pos=dbuf[pos];
@@ -488,25 +480,19 @@ decode_next_byte:
 			bd->totalCRC=bd->headerCRC+1;
 			return RETVAL_LAST_BLOCK;
 		}
-		/* james@bx.psu.edu -- rather than falling through we return here */
-        return gotcount;
 	}
-	
-    goto decode_next_byte;
-}
 
-int init_block( bunzip_data *bd )
-{
-    int status;
-    /* Refill the intermediate buffer by huffman-decoding next block of input */
+	/* Refill the intermediate buffer by huffman-decoding next block of input */
 	/* (previous is just a convenient unused temp variable here) */
-	status=get_next_block(bd);
-	if(status) {
-		bd->writeCount=status;
-        return status;
+	previous=get_next_block(bd);
+	if(previous) {
+		bd->writeCount=previous;
+		return (previous!=RETVAL_LAST_BLOCK) ? previous : gotcount;
 	}
 	bd->writeCRC=0xffffffffUL;
-    return RETVAL_OK;
+	pos=bd->writePos;
+	current=bd->writeCurrent;
+	goto decode_next_byte;
 }
 
 /* Allocate the structure, read file header.  If in_fd==-1, inbuf must contain
@@ -565,16 +551,10 @@ extern int uncompressStream(int src_fd, int dst_fd)
 	if(!(outbuf=malloc(IOBUF_SIZE))) return RETVAL_OUT_OF_MEMORY;
 	if(!(i=start_bunzip(&bd,src_fd,0,0))) {
 		for(;;) {
-            if (((i=init_block(bd)) < 0)) break;
-            // fprintf( stderr, "init: %d\n", i );
-            for(;;)
-            {
-			    if((i=read_bunzip(bd,outbuf,IOBUF_SIZE)) <= 0) break;
-                // fprintf( stderr, "read: %d\n", i );
-			    if(i!=write(dst_fd,outbuf,i)) {
-				    i=RETVAL_UNEXPECTED_OUTPUT_EOF;
-				    break;
-			    }
+			if((i=read_bunzip(bd,outbuf,IOBUF_SIZE)) <= 0) break;
+			if(i!=write(dst_fd,outbuf,i)) {
+				i=RETVAL_UNEXPECTED_OUTPUT_EOF;
+				break;
 			}
 		}
 	}
@@ -586,7 +566,7 @@ extern int uncompressStream(int src_fd, int dst_fd)
 	return i;
 }
 
-#ifdef MICRO_BUNZIP_MAIN
+#ifdef TESTING
 
 static char * const bunzip_errors[]={NULL,"Bad file checksum","Not bzip data",
 		"Unexpected input EOF","Unexpected output EOF","Data error",
@@ -598,9 +578,8 @@ int main(int argc, char *argv[])
 	int i=uncompressStream(0,1);
 	char c;
 
-	if(i) fprintf(stderr,"%d: %s\n", i, bunzip_errors[-i]);
+	if(i) fprintf(stderr,"%s\n", bunzip_errors[-i]);
     else if(read(0,&c,1)) fprintf(stderr,"Trailing garbage ignored\n");
 	return -i;
 }
-
 #endif
