@@ -55,6 +55,9 @@ int uncompressblock( int src_fd, unsigned long pos )
         /* Init the CRC for writing */
         bd->writeCRC = 0xffffffffUL;
         
+        /* Zero this so the current byte from before the seek is not written */
+        bd->writeCopies = 0;
+        
         /* Decompress the block and write to stdout */
         for ( ; ; )
         {

@@ -8,6 +8,9 @@ all: $(PROGS)
 bzip-table : bzip-table.o micro-bunzip.o
 seek-bunzip : seek-bunzip.o micro-bunzip.o
 
+micro-bunzip : micro-bunzip.c
+	$(CC) $(CFLAGS) -DMICRO_BUNZIP_MAIN $< -o $@
+
 test: bzip-table seek-bunzip
 	# Generate 10 megabytes of random data
 	dd if=/dev/random of=test_random.dat bs=1024k count=4
