@@ -18,7 +18,7 @@ int main( int argc, char*argv[] )
 {
     bunzip_data *bd;
     int status;
-    unsigned long position;
+    unsigned long long position;
     char * c;
     char buffer[BUF_SIZE];
     int gotcount;
@@ -67,7 +67,7 @@ int main( int argc, char*argv[] )
                 }
             }
             /* Print the position of the first bit in the block header */
-            fprintf( stdout, "%u\t%d\n", position, totalcount );
+            fprintf( stdout, "%llu\t%d\n", position, totalcount );
         }
     }
     
