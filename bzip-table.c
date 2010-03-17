@@ -29,25 +29,26 @@ int main( int argc, char*argv[] )
      */
     if ( ! ( status = start_bunzip( &bd, 0, 0, 0 ) ) )
     {
-        for( ; ; )
-        {               
+        for ( ; ; )
+        {
             /* Determine position */
-            position = lseek( bd->in_fd, 0, SEEK_CUR ) - bd->inbufCount + bd->inbufPos;
+            position = bd->position;
+            position = position - bd->inbufCount + bd->inbufPos;
             position = position * 8 - bd->inbufBitCount;
 
             /* Read one block */
             status = get_next_block( bd );
-            
+
             /* Reset the total size counter for each block */
             totalcount = 0;
 
             /* Non-zero return value indicates an error, break out */
             if ( status ) break;
-            
+
             /* This is really the only other thing init_block does, hrmm */
             bd->writeCRC = 0xffffffffUL;
-            
-            /* Decompress the block and throw away, but keep track of the 
+
+            /* Decompress the block and throw away, but keep track of the
                total size of the decompressed data */
             for ( ; ; )
             {
@@ -70,11 +71,11 @@ int main( int argc, char*argv[] )
             fprintf( stdout, "%llu\t%d\n", position, totalcount );
         }
     }
-    
+
 bzip_table_finish:
 
     /* If we reached the last block, do a CRC check */
-    if ( status == RETVAL_LAST_BLOCK && bd->headerCRC == bd->totalCRC) 
+    if ( status == RETVAL_LAST_BLOCK && bd->headerCRC == bd->totalCRC )
     {
         status = RETVAL_OK;
     }

@@ -31,12 +31,12 @@ unsigned int seek_bits( bunzip_data *bd, unsigned long pos )
 
     // // Update the bit position counter to match
     // bd->inPosBits = pos;
-    
+
     return pos;
 }
 
 /* Open, seek to block at pos, and uncompress */
- 
+
 int uncompressblock( int src_fd, unsigned long pos )
 {
     bunzip_data *bd;
@@ -45,19 +45,19 @@ int uncompressblock( int src_fd, unsigned long pos )
     char outbuf[BUF_SIZE];
 
     if ( !( status = start_bunzip( &bd, src_fd, 0, 0 ) ) )
-    {        
+    {
         seek_bits( bd, pos );
 
         /* Fill the decode buffer for the block */
-        if ( (status = get_next_block( bd ) ) )
+        if ( ( status = get_next_block( bd ) ) )
             goto seek_bunzip_finish;
-        
+
         /* Init the CRC for writing */
         bd->writeCRC = 0xffffffffUL;
-        
+
         /* Zero this so the current byte from before the seek is not written */
         bd->writeCopies = 0;
-        
+
         /* Decompress the block and write to stdout */
         for ( ; ; )
         {
@@ -73,11 +73,11 @@ int uncompressblock( int src_fd, unsigned long pos )
             }
             else
             {
-                write( 1, outbuf, gotcount ); 
+                write( 1, outbuf, gotcount );
             }
         }
     }
-    
+
 seek_bunzip_finish:
 
     if ( bd->dbuf ) free( bd->dbuf );
@@ -86,10 +86,10 @@ seek_bunzip_finish:
     return status;
 }
 
-int main(int argc, char *argv[])
+int main( int argc, char *argv[] )
 {
- unsigned long pos = atol( argv[1] );
- int status = uncompressblock(0,pos);
- if ( status )
-     fprintf(stderr,"\n%s\n", bunzip_errors[-status] );
+    unsigned long pos = atol( argv[1] );
+    int status = uncompressblock( 0, pos );
+    if ( status )
+        fprintf( stderr, "\n%s\n", bunzip_errors[-status] );
 }

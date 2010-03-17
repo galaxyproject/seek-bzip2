@@ -1,4 +1,4 @@
-CC = gcc
+CC = gcc -m64
 CFLAGS = -O3 # -DTESTING
 
 PROGS=bzip-table seek-bunzip
